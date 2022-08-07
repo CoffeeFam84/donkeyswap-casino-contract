@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 // Import this file to use console.log
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 interface IERC20 {
   function transferFrom(address, address, uint256) external returns (bool);
@@ -204,11 +204,11 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 
 contract DonkeyKingTrade {
     address payable public owner;
-    IERC20 public dst = IERC20(0x3969Fe107bAe2537cb58047159a83C33dfbD73f9);
-    address payable public casinoWallet = payable(0x9E3f95e648E15B0E5B85Dc6481f0B336c3D68832);
-    address payable public devWallet1 = payable(0x6b96AEdb09cA958f5e9409baf09190131525b27b);
-    address payable public devWallet2 = payable(0xBD861551F6C6D5f6472A843c325E50b6bb849dce);
-    IUniswapV2Pair public uniswapV2Pair = IUniswapV2Pair(0x3969Fe107bAe2537cb58047159a83C33dfbD73f9);
+    IERC20 public dst;
+    address payable public casinoWallet;
+    address payable public devWallet1;
+    address payable public devWallet2;
+    IUniswapV2Pair public uniswapV2Pair = IUniswapV2Pair(0x7123431162c1efF257578D1574014e5305Eb7bd4);
     IUniswapV2Router02 public uniswapV2Router = IUniswapV2Router02(0xe779e189a865e880CCCeBC75bC353E38DE487030);
 
     uint256 public feeRate = 30;
@@ -219,7 +219,11 @@ contract DonkeyKingTrade {
     event BUYCHIPS(address buyer, uint256 amount);
     event SELLCHIPS(address seller, uint256 amount);
 
-    constructor() payable {
+    constructor(address _dst, address _casino, address _dev1, address _dev2) payable {
+        dst = IERC20(_dst);
+        casinoWallet = payable(_casino);
+        devWallet1 = payable(_dev1);
+        devWallet2 = payable(_dev2);
         owner = payable(msg.sender);
     }
 
@@ -239,7 +243,7 @@ contract DonkeyKingTrade {
         takeTransactionFee(dstAmount);
       }
 
-      emit BUYCHIPS(msg.sender, dstAmount);
+      emit BUYCHIPS(msg.sender, amount);
     }
 
     function sellChips(uint amount) public payable {
@@ -255,7 +259,7 @@ contract DonkeyKingTrade {
       }
 
       if (takeFee) {
-        takeTransactionFee(dstAmount);
+        takeTransactionFee(amount);
       }
 
       emit SELLCHIPS(msg.sender, dstAmount);
@@ -289,10 +293,16 @@ contract DonkeyKingTrade {
       blockTransaction[account] = false;
     }
 
+    function setUniswapPair(address account) public onlyOwner {
+      uniswapV2Pair = IUniswapV2Pair(account);
+    }
+
+    function setUniswapRouter(address account) public onlyOwner {
+      uniswapV2Router = IUniswapV2Router02(account);
+    }
+
     function takeTransactionFee(uint256 dstAmount) internal {
-      (uint112 reserve0, uint112 reserve1,) = uniswapV2Pair.getReserves();
-      uint bnbAmount = uniswapV2Router.getAmountOut(dstAmount, reserve0, reserve1);
-      uint feeAmount = bnbAmount * feeRate / 1000;
+      uint feeAmount = getTransactionFee(dstAmount);
       require(msg.value >= feeAmount, "Insufficient Tx Fee");
       uint256 casinoFee = feeAmount * 60 / 100;
       uint256 devFee = feeAmount * 20 / 100;
@@ -304,8 +314,15 @@ contract DonkeyKingTrade {
       require(success, "Transfer failed.");
     }
 
-    function transactionFee() public view returns (bool) {
+    function txFeeEnabled() public view returns (bool) {
       return _takeFee;
+    }
+
+    function getTransactionFee(uint256 dstAmount) public view returns (uint) {
+      (uint112 reserve0, uint112 reserve1,) = uniswapV2Pair.getReserves();
+      uint bnbAmount = uniswapV2Router.getAmountOut(dstAmount, reserve0, reserve1);
+      uint feeAmount = bnbAmount * feeRate / 1000;
+      return feeAmount;
     }
 
     modifier onlyOwner {
