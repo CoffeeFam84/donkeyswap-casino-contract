@@ -259,10 +259,10 @@ contract DonkeyKingTrade {
       }
 
       if (takeFee) {
-        takeTransactionFee(amount);
+        takeTransactionFee(dstAmount);
       }
 
-      emit SELLCHIPS(msg.sender, dstAmount);
+      emit SELLCHIPS(msg.sender, amount);
     }
 
     function excludeFromFee(address account) public onlyOwner {
