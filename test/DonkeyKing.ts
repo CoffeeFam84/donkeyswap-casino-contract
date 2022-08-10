@@ -19,10 +19,14 @@ describe("DonkeyKing", function () {
     await dst.mint(casinoWallet.address, '1000000000000000');
     
     const DonkeyKing = await ethers.getContractFactory("DonkeyKingTrade");
-    const donkey = await DonkeyKing.deploy(dst.address, casinoWallet.address, devWallet1.address, devWallet2.address);
+    const donkey = await DonkeyKing.deploy();
+    await donkey.setDSTAddress(dst.address);
+    await donkey.setCasinoWallet(casinoWallet.address);
+    await donkey.setDev1Wallet(devWallet1.address);
+    await donkey.setDev2Wallet(devWallet2.address);
 
-    dst.approve(donkey.address, '1000000000000000');
-    dst.approve(casinoWallet.address, '1000000000000000');
+    await dst.approve(donkey.address, '1000000000000000');
+    await dst.approve(casinoWallet.address, '1000000000000000');
 
     const UniswapMock = await ethers.getContractFactory("MockRouterPair");
     const uniswapMock = await UniswapMock.deploy();
