@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 // Import this file to use console.log
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
 interface IERC20 {
@@ -202,8 +203,7 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
     ) external;
 }
 
-contract DonkeyKingTrade {
-    address payable public owner;
+contract DonkeyKingTrade is Ownable {
     IERC20 public dst = IERC20(0x3969Fe107bAe2537cb58047159a83C33dfbD73f9);
     address payable public casinoWallet = payable(0x9E3f95e648E15B0E5B85Dc6481f0B336c3D68832);
     address payable public devWallet1 = payable(0x6b96AEdb09cA958f5e9409baf09190131525b27b);
@@ -220,7 +220,6 @@ contract DonkeyKingTrade {
     event SELLCHIPS(address seller, uint256 amount);
 
     constructor() {
-        owner = payable(msg.sender);
     }
 
     function buyChips(uint amount) public payable {
@@ -335,10 +334,5 @@ contract DonkeyKingTrade {
       uint bnbAmount = uniswapV2Router.getAmountOut(dstAmount, reserve0, reserve1);
       uint feeAmount = bnbAmount * feeRate / 1000;
       return feeAmount;
-    }
-
-    modifier onlyOwner {
-      require(msg.sender == owner, "Caller is not the owner");
-      _;
     }
 }
