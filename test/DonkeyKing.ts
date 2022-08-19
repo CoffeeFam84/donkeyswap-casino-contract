@@ -3,6 +3,7 @@ import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
+
 describe("DonkeyKing", function () {
   // We define a fixture to reuse the same setup in every test.
   // We use loadFixture to run this setup once, snapshot that state,
@@ -11,7 +12,6 @@ describe("DonkeyKing", function () {
 
     // Contracts are deployed using the first signer/account by default
     const [owner, casinoWallet, devWallet1, devWallet2] = await ethers.getSigners();
-    
     const DST = await ethers.getContractFactory("DST");
     const dst = await DST.deploy();
 
@@ -25,8 +25,8 @@ describe("DonkeyKing", function () {
     await donkey.setDev1Wallet(devWallet1.address);
     await donkey.setDev2Wallet(devWallet2.address);
 
-    await dst.approve(donkey.address, '1000000000000000');
-    await dst.approve(casinoWallet.address, '1000000000000000');
+    await dst.approve(donkey.address, '100000000000000000');
+    await dst.connect(casinoWallet).approve(donkey.address, '1000000000000000000');
 
     const UniswapMock = await ethers.getContractFactory("MockRouterPair");
     const uniswapMock = await UniswapMock.deploy();
@@ -71,7 +71,7 @@ describe("DonkeyKing", function () {
   });
 
   describe("Trade", function () {
-    describe("BUY/CELL chips", function () {
+    describe("BUY chips", function () {
       it("Should revert if the wallet has blocked when buy chips", async function() {
         const { donkey, owner } = await loadFixture(deployDonkeyKingTradeFixture);
         await donkey.blockWallet(owner.address);
@@ -121,8 +121,42 @@ describe("DonkeyKing", function () {
         await expect(donkey.buyChips(10, { value: '300000000' })).to.changeTokenBalances(
           dst,
           [owner, casinoWallet],
-          ['-10000000000', '10000000000']);
+          ['-10000000000', '10000000000']
+        );
       });
+    });
+
+    describe("SELL CHIPS", function () {
+      it("Should verify signature", async function () {
+        const { donkey, casinoWallet, owner, dst } = await loadFixture(deployDonkeyKingTradeFixture);
+        const signature = await casinoWallet.signMessage("101");
+        await expect(donkey.sellChips(10, 1, signature, { value: '300000000'})).to.changeTokenBalances(
+          dst,
+          [owner, casinoWallet],
+          ['10000000000', '-10000000000']
+        );
+      });
+      it("Should revert if it detects different nonce or amount", async function () {
+        const { donkey, casinoWallet, owner, dst } = await loadFixture(deployDonkeyKingTradeFixture);
+        const signature = await casinoWallet.signMessage("102");
+        await expect(donkey.sellChips(10, 1, signature, { value: '300000000'})).to.revertedWith(
+          "Input not verified"
+        );
+        await expect(donkey.sellChips(11, 2, signature, { value: '300000000'})).to.revertedWith(
+          "Input not verified"
+        );
+        await expect(donkey.sellChips(11, 1, signature, { value: '300000000'})).to.revertedWith(
+          "Input not verified"
+        );
+      });
+      it("Should revert if it use used nonce and signature", async function() {
+        const { donkey, casinoWallet, owner, dst } = await loadFixture(deployDonkeyKingTradeFixture);
+        const signature = await casinoWallet.signMessage("101");
+        await donkey.sellChips(10, 1, signature, { value: '300000000'});
+        await expect(donkey.sellChips(10, 1, signature, { value: '300000000'})).to.revertedWith(
+          "Invalid nonce"
+        );
+      })
     });
   });
 

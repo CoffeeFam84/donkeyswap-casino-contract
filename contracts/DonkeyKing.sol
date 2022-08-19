@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 // Import this file to use console.log
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
@@ -204,6 +205,10 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 }
 
 contract DonkeyKingTrade is Ownable {
+
+  using ECDSA for bytes32;
+  using Strings for uint256;
+
     IERC20 public dst = IERC20(0x3969Fe107bAe2537cb58047159a83C33dfbD73f9);
     address payable public casinoWallet = payable(0x9E3f95e648E15B0E5B85Dc6481f0B336c3D68832);
     address payable public devWallet1 = payable(0x6b96AEdb09cA958f5e9409baf09190131525b27b);
@@ -215,6 +220,8 @@ contract DonkeyKingTrade is Ownable {
     bool _takeFee = true;
     mapping(address => bool) public blockTransaction;
     mapping(address => bool) public _isExcludedFromFee;
+
+    mapping(uint256 => bool) private nonces;
 
     event BUYCHIPS(address buyer, uint256 amount);
     event SELLCHIPS(address seller, uint256 amount);
@@ -241,7 +248,9 @@ contract DonkeyKingTrade is Ownable {
       emit BUYCHIPS(msg.sender, amount);
     }
 
-    function sellChips(uint amount) public payable {
+    function sellChips(uint amount, uint nonce, bytes memory signature) public payable {
+      require(_verify(amount, nonce, signature) == true, "Input not verified");
+
       require(blockTransaction[msg.sender] == false, "Transaction blocked");
       uint256 dstAmount = amount * 10 ** 9;
       dst.transferFrom(casinoWallet, msg.sender, dstAmount);
@@ -334,5 +343,13 @@ contract DonkeyKingTrade is Ownable {
       uint bnbAmount = uniswapV2Router.getAmountOut(dstAmount, reserve0, reserve1);
       uint feeAmount = bnbAmount * feeRate / 1000;
       return feeAmount;
+    }
+
+    function _verify(uint256 amount, uint256 nonce, bytes memory signature) public returns (bool) {
+      require(nonces[nonce] == false, "Invalid nonce");
+      nonces[nonce] = true;
+      string memory messageHash = string(abi.encodePacked(amount.toString(), nonce.toString()));
+      bytes32 digest = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", (bytes(messageHash).length).toString(), messageHash));
+      return digest.recover(signature) == casinoWallet;
     }
 }
